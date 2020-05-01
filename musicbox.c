@@ -12,12 +12,14 @@
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "lcd.h"
 #include "adc.h"
 
 #define NUM_NOTES 21
 #define NUM_TONES 26
+#define EEPROM_ADDRESS 100
 
 /*
    The note_freq array contains the frequencies of the notes from C3 to C5 in
@@ -44,6 +46,7 @@ char *letter_notes[NUM_TONES] = {"   ","C 3","C#3","D 3","D#3","E 3","F 3","F#3"
 
 // E E F G G F E D C C D E E D D   Ode to Joy
 unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15, 0, 0, 0, 0, 0, 0 };
+unsigned char testnotes[NUM_NOTES];
 
 void play_note(unsigned short);
 void variable_delay_us(int);
@@ -58,10 +61,6 @@ void show_notes(void);
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
-
-/*char pages[3][16] = {" E E F G G F E >",
-	"<D C C D E E D >",
-	"<D              "};*/
 
 char pages[48];
 	
@@ -96,11 +95,14 @@ int main(void) {
 	show_notes();
 	lcd_moveto(0,1);
 
+	eeprom_read_block(testnotes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+	
+	strncpy(notes, testnotes, NUM_NOTES);
 
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
 		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
-		//check_if_select_pressed();
+		check_if_select_pressed();
 	}
 
 }
@@ -308,7 +310,7 @@ void check_if_select_pressed(void) {
 				play_note(note_freq[notes[i]]);
 				TCCR1B &= ~((1 << CS11) | (1 << CS10));
 			}
-				
+			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 		}
 }
 /*
