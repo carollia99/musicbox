@@ -93,6 +93,22 @@ int main(void) {
 	
 	//check if all values stored in eeprom work. If not, notes takes default state
 	verify_eeprom();
+	
+	//show_initial_screen(); // splash screen
+	show_notes();
+	lcd_moveto(0,1);
+	
+
+	while (1) { //TODO: rotary encoder bugs
+		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
+		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
+		check_if_select_pressed();
+	}
+
+
+}
+
+void verify_eeprom(void) {
 	char eeprom_good = 1;
 
 	eeprom_read_block(testnotes, (void *) EEPROM_ADDRESS, NUM_NOTES);
@@ -110,19 +126,6 @@ int main(void) {
 	if (eeprom_good) {
 		strncpy(notes, testnotes, NUM_NOTES);
 	} 
-	
-	//show_initial_screen(); // splash screen
-	show_notes();
-	lcd_moveto(0,1);
-	
-
-	while (1) { //TODO: rotary encoder bugs
-		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
-		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
-		check_if_select_pressed();
-	}
-
-
 }
 
 void show_notes(void) {
