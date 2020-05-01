@@ -73,7 +73,7 @@ char pages[48];
 //counting cursor and page
 int lcd_col = 1;
 //int page_num = 1;
-int page_num = 0; // pages are zero-indexed for my ease
+unsigned char page_num = 0; // pages are zero-indexed for my ease
 
 unsigned volatile char encoder_new_state, encoder_old_state;
 unsigned volatile char encoder_changed = 0;  // Flag for state change
@@ -110,6 +110,9 @@ void show_notes(void) {
 	unsigned char note;
 	char *p;
 	int i;
+	
+	lcd_moveto(1,0);
+	lcd_writedata(page_num + '1');
 
 	for (i = 0; i < 7; i++) {
 		note = notes[n];
