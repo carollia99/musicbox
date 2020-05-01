@@ -45,14 +45,23 @@ unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17
 
 void play_note(unsigned short);
 void variable_delay_us(int);
+void init_TIMER1(void);
+
+int isr_count = 0;
+int max_count = 0;
+volatile int next_note = 0;
 
 int main(void) {
-	// Initialize various modules and functions and variables
+	// Initialize various modules and functions
 	lcd_init();
 	adc_init();
 	lcd_writecommand(1);
 	DDRB |= (1 << PB4);
+	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
+	init_TIMER1();
+	
+	//Initialize variables
 	int lcd_col = 1;
 	int page_num = 1;
 	char initial_page[16] = " E E F G G F E >";
@@ -61,23 +70,24 @@ int main(void) {
 
 	// Show splash screen
 	lcd_stringout("Carol Liang");
-	_delay_ms(1000);
+	/*_delay_ms(1000);
 	lcd_writecommand(1);
 	lcd_moveto(0,0);
 	lcd_stringout("should move");
 	_delay_ms(500);
 	lcd_moveto(0,0);
 	lcd_stringout(initial_page);
+	*/
 
-
-	/*int i;
-	for (i = 0; i < NUM_TONES; i++) {
+	int i;
+	for (i = 0; i < 21; i++) {
 		play_note(note_freq[i]);
-	}*/
+	}
 
-	while (1) {
+	
+	/*while (1) {
 		unsigned char curadc = adc_sample(0);
-		/* Check if a button on the LCD was pressed */
+		//Check if a button on the LCD was pressed
 		if (curadc > 0 && curadc < 5) {
 			_delay_ms(200);
 			lcd_col += 2;
@@ -108,11 +118,11 @@ int main(void) {
 				}
 			}
 			lcd_moveto(0, lcd_col);
-		}
+		}*/
 
 		/* If rotary encoder was rotated, change note tone */
 
-	}
+	//}
 
 	while (1) {                 // Loop forever
 
@@ -127,24 +137,45 @@ int main(void) {
    Code for showing notes on the screen and playing the notes.
    */
 
-
-
-
-
 /* ------------------------------------------------------------------ */
 
 /*
    Code for initializing TIMER1 and its ISR
    */
 
+void init_TIMER1(void) {
+	// enable timer interrupt
+	TIMSK1 |= (1 << OCIE1A);
+	TCCR1B |= (1 << WGM12);
+	sei();
+}
 
-
+void play_note(unsigned short freq) // in here, configure timer module
+{
+	int ocr1a_val = (16000000/(2*freq)) / 64;
+	OCR1A = ocr1a_val;
+	
+	int max_count = freq;
+	
+	//prescalar = 64
+	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
+	
+	/*while (1) {
+		if (next_note) {
+			next_note = 0;
+			return;
+		}
+	}*/
+}
 
 ISR(TIMER1_COMPA_vect)
 {
-
-
-
+	PORTB = PORTB ^ (0b00010000); // invert PB4
+	/*isr_count++;
+	if (isr_count > max_count) {
+		isr_count = 0;
+		next_note = 1;
+	}*/
 }
 
 /* ------------------------------------------------------------------ */
@@ -153,36 +184,5 @@ ISR(TIMER1_COMPA_vect)
    Code for initializing TIMER2
    */
 
-void play_note(unsigned short freq)
-{
-	unsigned long period;
-
-	period = 1000000 / freq;      // Period of note in microseconds
-
-	while (freq--) {
-		// Make PB4 high
-		PORTB |= (1 << PB4);
-
-		// Use variable_delay_us to delay for half the period
-		variable_delay_us(period/2);
-
-		// Make PB4 low
-		PORTB &= ~(1 << PB4);
-
-		// Delay for half the period again
-		variable_delay_us(period/2);
-	}
-}
-
-/*
-   variable_delay_us - Delay a variable number of microseconds
-   */
-void variable_delay_us(int delay)
-{
-	int i = (delay + 5) / 10;
-
-	while (i--)
-		_delay_us(10);
-}
 
 
