@@ -44,21 +44,23 @@ char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A',
 //unsigned char notes[NUM_NOTES] = {15, 15, 12, 13, 10, 12, 8, 7, 5, 3, 10, 13, 10, 12};
 
 // E E F G G F E D C C D E E D D   Ode to Joy
-unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15 };
+unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15, 0, 0, 0, 0, 0, 0 };
 
 void play_note(unsigned short);
 void variable_delay_us(int);
 void init_TIMER1(void);
 void show_initial_screen(void);
 void move_cursor_ifneeded(void);
+void change_note_ifneeded(void);
+void check_if_select_pressed(void);
 
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
 
 char pages[3][16] = {" E E F G G F E >",
-					 "<D C C D E E D >",
-					 "<D              "};
+	"<D C C D E E D >",
+	"<D              "};
 
 //counting cursor and page
 int lcd_col = 1;
@@ -67,7 +69,6 @@ int page_num = 0; // pages are zero-indexed for my ease
 
 unsigned volatile char encoder_new_state, encoder_old_state;
 unsigned volatile char encoder_changed = 0;  // Flag for state change
-//int volatile count = 0;		// Count to display
 unsigned volatile char encoderA, encoderB;
 unsigned volatile char encoderVal;
 unsigned volatile char encoder_changed_up;
@@ -109,35 +110,11 @@ int main(void) {
 	show_initial_screen(); // splash screen and initial page
 	lcd_moveto(0,1);
 
-	/*int i;
-	  for (i = 0; i < 21; i++) {
-	  play_note(note_freq[i]);
-	  }*/
-	  
-
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
-		if (encoder_changed) {
-			encoder_changed = 0;
-			if (encoder_changed_up) {
-				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-				unsigned char indexnote = notes[index]; //which number note in the tune?
-				pages[page_num][lcd_col] = letter_notes[indexnote+1]; //change the letter to one higher
-				lcd_stringout(letter_notes[indexnote+1]); //print out that letter
-				lcd_moveto(0,lcd_col); //move cursor back
-			} else {
-				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-				unsigned char indexnote = notes[index]; //which number note in the tune?
-				pages[page_num][lcd_col] = letter_notes[indexnote-1]; //change the letter to one higher
-				lcd_stringout(letter_notes[indexnote-1]); //print out that letter
-				lcd_moveto(0,lcd_col); //move cursor back
-			}
-		}
+		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
+		check_if_select_pressed();
 	}
-
-	/* If rotary encoder was rotated, change note tone */
-
-	//}
 
 }
 
@@ -236,7 +213,37 @@ void move_cursor_ifneeded(void) {
 	}
 }
 /* ------------------------------------------------------------------ */
+void change_note_ifneeded(void) {
+	if (encoder_changed) {
+		encoder_changed = 0;
+		if (encoder_changed_up) {
+			int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
+			unsigned char indexnote = notes[index]; //which number note in the tune?
+			pages[page_num][lcd_col] = letter_notes[indexnote+1]; //change the letter to one higher
+			lcd_stringout(letter_notes[indexnote+1]); //print out that letter
+			lcd_moveto(0,lcd_col); //move cursor back
+		} else {
+			int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
+			unsigned char indexnote = notes[index]; //which number note in the tune?
+			pages[page_num][lcd_col] = letter_notes[indexnote-1]; //change the letter to one higher
+			lcd_stringout(letter_notes[indexnote-1]); //print out that letter
+			lcd_moveto(0,lcd_col); //move cursor back
+		}
+	}
+}
 
+void check_if_select_pressed(void) {
+	unsigned char curadc = adc_sample(0);
+		if (curadc > 205 && curadc < 215) {
+			_delay_ms(200);
+			int i;
+			for (i = 0; i < NUM_NOTES; i++) {
+				play_note(note_freq[notes[i]]);
+			}
+			TCCR1B &= ~((1 << CS11) | (1 << CS10)); 
+				
+		}
+}
 /*
    Code for showing notes on the screen and playing the notes.
    */
