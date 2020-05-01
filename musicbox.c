@@ -46,10 +46,14 @@ unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17
 void play_note(unsigned short);
 void variable_delay_us(int);
 void init_TIMER1(void);
+void show_initial_screen(void);
 
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
+char initial_page[16] = " E E F G G F E >";
+char second_page[16] = "<D C C D E E D >";
+char last_page[16] = "<D D D D D D ";
 
 int main(void) {
 	// Initialize various modules and functions
@@ -64,20 +68,8 @@ int main(void) {
 	//Initialize variables
 	int lcd_col = 1;
 	int page_num = 1;
-	char initial_page[16] = " E E F G G F E >";
-	char second_page[16] = "<D C C D E E D >";
-	char last_page[16] = "<D D D D D D ";
-
-	// Show splash screen
-	lcd_stringout("Carol Liang");
-	/*_delay_ms(1000);
-	lcd_writecommand(1);
-	lcd_moveto(0,0);
-	lcd_stringout("should move");
-	_delay_ms(500);
-	lcd_moveto(0,0);
-	lcd_stringout(initial_page);
-	*/
+	
+	show_initial_screen(); // splash screen and initial page
 
 	int i;
 	for (i = 0; i < 21; i++) {
@@ -136,6 +128,14 @@ int main(void) {
 /*
    Code for showing notes on the screen and playing the notes.
    */
+   
+void show_initial_screen(void) {
+	lcd_stringout("Carol Liang");
+	_delay_ms(1000);
+	lcd_writecommand(1);
+	lcd_moveto(0,0);
+	lcd_stringout(initial_page);
+}
 
 /* ------------------------------------------------------------------ */
 
