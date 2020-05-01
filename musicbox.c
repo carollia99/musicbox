@@ -29,7 +29,6 @@ unsigned int note_freq[NUM_TONES] =
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
 
 char *letter_notes[NUM_TONES] = {"   ","C 3","C#3","D 3","D#3","E 3","F 3","F#3","G 3","G#3","A 3","A#3","B 3","C 4","C#4","D 4","D#4","E 4","F 4","F#4","G 4","G#4","A 4","A#4","B 4","C 5"};
-//char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A','B','C','C','D','D','E','F','F','G','G','A','A','B','C'};
 
 /* Some sample tunes for testing */
 /*
@@ -54,7 +53,7 @@ void move_cursor_ifneeded(void);
 void change_note_ifneeded(void);
 void check_if_select_pressed(void);
 void init_encoder(void);
-void show_initial_notes(void);
+void show_notes(void);
 
 int isr_count = 0;
 int max_count = 0;
@@ -74,6 +73,7 @@ char pages[48];
 int lcd_col = 1;
 //int page_num = 1;
 unsigned char page_num = 0; // pages are zero-indexed for my ease
+unsigned char note_num = 0;
 
 unsigned volatile char encoder_new_state, encoder_old_state;
 unsigned volatile char encoder_changed = 0;  // Flag for state change
@@ -99,7 +99,7 @@ int main(void) {
 
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
-		//change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
+		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
 		//check_if_select_pressed();
 	}
 
@@ -233,14 +233,17 @@ void move_cursor_ifneeded(void) {
 	if (curadc > 0 && curadc < 30) {
 		_delay_ms(200);
 		lcd_col += 2;
+		note_num += 1;
 		if (lcd_col > 15) {
 			lcd_col = 1;
 			lcd_moveto(0,0);
 			if (page_num == 0) {
 				page_num += 1;
+				note_num = page_num * 7;
 				show_notes();
 			} else if (page_num == 1) {
 				page_num += 1;
+				note_num = page_num * 7;
 				show_notes();
 			}
 		}
@@ -248,14 +251,17 @@ void move_cursor_ifneeded(void) {
 	} else if (curadc > 154 && curadc < 160) {
 		_delay_ms(200);
 		lcd_col -= 2;
+		note_num -= 1;
 		if (lcd_col < 0) {
 			lcd_col = 15;
 			lcd_moveto(0,0);
 			if (page_num == 1) {
 				page_num -= 1;
+				note_num = page_num * 7 + 8;
 				show_notes();
 			} else if (page_num == 2) {
 				page_num -= 1;
+				note_num = page_num * 7 + 8;
 				show_notes();
 			}
 		}
@@ -263,24 +269,30 @@ void move_cursor_ifneeded(void) {
 	}
 }
 /* ------------------------------------------------------------------ */
-/*void change_note_ifneeded(void) {
+void change_note_ifneeded(void) {
+	char *p;
 	if (encoder_changed) {
 		encoder_changed = 0;
 		if (encoder_changed_up) {
-			int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-			unsigned char indexnote = notes[index]; //which number note in the tune?
-			pages[page_num][lcd_col] = letter_notes[indexnote+1]; //change the letter to one higher
-			lcd_stringout(letter_notes[indexnote+1]); //print out that letter
-			lcd_moveto(0,lcd_col); //move cursor back
+			int index = notes[note_num]; //numeric value of note (0,13, 17,etc)
+			if (index < NUM_TONES-1) {
+				notes[note_num] = index+1;
+				p = letter_notes[index+1];
+				lcd_writedata(*p); //print out that letter string
+				lcd_writedata(*(p+1));
+				lcd_moveto(1, lcd_col);
+				lcd_writedata(*(p+2));
+				lcd_moveto(0,lcd_col); //move cursor back
+			}
 		} else {
-			int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
+			/*int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
 			unsigned char indexnote = notes[index]; //which number note in the tune?
-			pages[page_num][lcd_col] = letter_notes[indexnote-1]; //change the letter to one higher
+			unsigned char indexnote = notes[index]; //which number note in the tune?
 			lcd_stringout(letter_notes[indexnote-1]); //print out that letter
-			lcd_moveto(0,lcd_col); //move cursor back
+			lcd_moveto(0,lcd_col); //move cursor back*/
 		}
 	}
-}*/
+}
 
 void check_if_select_pressed(void) {
 	unsigned char curadc = adc_sample(0);
@@ -291,7 +303,6 @@ void check_if_select_pressed(void) {
 				play_note(note_freq[notes[i]]);
 				TCCR1B &= ~((1 << CS11) | (1 << CS10));
 			}
-			 
 				
 		}
 }
