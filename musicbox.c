@@ -110,9 +110,18 @@ void show_notes(void) {
 	unsigned char note;
 	char *p;
 	int i;
-	
+	lcd_writecommand(1);
 	lcd_moveto(1,0);
 	lcd_writedata(page_num + '1');
+	
+	if (page_num == 0 || page_num == 1) {
+		lcd_moveto(0,15);
+		lcd_writedata('>');
+	}
+	if (page_num == 1 || page_num == 2) {
+		lcd_moveto(0,0);
+		lcd_writedata('<');
+	}
 
 	for (i = 0; i < 7; i++) {
 		note = notes[n];
