@@ -28,8 +28,8 @@ unsigned int note_freq[NUM_TONES] =
 { 0,   131, 139, 147, 156, 165, 176, 185, 196, 208, 220, 233, 247,
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
 
-//char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C"};
-char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A','B','C','C','D','D','E','F','F','G','G','A','A','B','C'};
+char *letter_notes[NUM_TONES] = {"   ","C 3","C#3","D 3","D#3","E 3","F 3","F#3","G 3","G#3","A 3","A#3","B 3","C 4","C#4","D 4","D#4","E 4","F 4","F#4","G 4","G#4","A 4","A#4","B 4","C 5"};
+//char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A','B','C','C','D','D','E','F','F','G','G','A','A','B','C'};
 
 /* Some sample tunes for testing */
 /*
@@ -53,14 +53,22 @@ void show_initial_screen(void);
 void move_cursor_ifneeded(void);
 void change_note_ifneeded(void);
 void check_if_select_pressed(void);
+void init_encoder(void);
+void show_initial_notes(void);
 
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
 
-char pages[3][16] = {" E E F G G F E >",
+/*char pages[3][16] = {" E E F G G F E >",
 	"<D C C D E E D >",
-	"<D              "};
+	"<D              "};*/
+
+char pages[48];
+	
+//one d character array, read characters in when arduino loads
+//letter_notes is strings - three characters for string
+//share location. 
 
 //counting cursor and page
 int lcd_col = 1;
@@ -82,42 +90,46 @@ int main(void) {
 	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
 	init_TIMER1();
+	init_encoder(); //rotary encoder
 
-	//rotary encoder
-	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
-	PORTC |= (1 << 5);
-	//Get interrupts working for rotary encoder
-	PCICR |= (1 << PCIE1);
-	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
-	sei();
-
-	//get current state of encoder
-	encoderVal = PINC;
-	encoderA = (encoderVal & (1 << 1));
-	encoderB = (encoderVal & (1 << 5));
-
-	if (!encoderB && !encoderA)
-		encoder_old_state = 0;
-	else if (!encoderB && encoderA)
-		encoder_old_state = 1;
-	else if (encoderB && !encoderA)
-		encoder_old_state = 2;
-	else
-		encoder_old_state = 3;
-
-	encoder_new_state = encoder_old_state;
-
-	show_initial_screen(); // splash screen and initial page
+	//show_initial_screen(); // splash screen
+	show_notes();
 	lcd_moveto(0,1);
+
 
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
-		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
-		check_if_select_pressed();
+		//change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
+		//check_if_select_pressed();
 	}
 
 }
 
+void show_notes(void) {
+	unsigned char n = page_num * 7;
+	unsigned char note;
+	char *p;
+	int i;
+
+	for (i = 0; i < 7; i++) {
+		note = notes[n];
+		p = letter_notes[note];
+		lcd_moveto(0, i*2+1);
+		lcd_writedata(*p);
+		lcd_writedata(*(p+1));
+		lcd_moveto(1, i*2+1);
+		lcd_writedata(*(p+2));
+		n++;
+	}
+}
+
+void move_cursor() {
+	unsigned char curadc = adc_sample(0);
+	if (curadc > 0 && curadc < 30) {
+		_delay_ms(200);
+	}
+	
+}
 ISR(PCINT1_vect) {
 	encoderVal = PINC;
 	encoderA = (encoderVal & (1 << 1));
@@ -176,6 +188,32 @@ ISR(PCINT1_vect) {
 	}
 }
 
+
+void init_encoder(void) {
+	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
+	PORTC |= (1 << 5);
+	//Get interrupts working for rotary encoder
+	PCICR |= (1 << PCIE1);
+	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
+	sei();
+
+	//get current state of encoder
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
+
+	if (!encoderB && !encoderA)
+		encoder_old_state = 0;
+	else if (!encoderB && encoderA)
+		encoder_old_state = 1;
+	else if (encoderB && !encoderA)
+		encoder_old_state = 2;
+	else
+		encoder_old_state = 3;
+
+	encoder_new_state = encoder_old_state;
+}
+
 void move_cursor_ifneeded(void) {
 	unsigned char curadc = adc_sample(0);
 	//check_cursor_move(curadc);
@@ -187,11 +225,11 @@ void move_cursor_ifneeded(void) {
 			lcd_col = 1;
 			lcd_moveto(0,0);
 			if (page_num == 0) {
-				lcd_stringout(pages[1]);
 				page_num += 1;
+				show_notes();
 			} else if (page_num == 1) {
-				lcd_stringout(pages[2]);
 				page_num += 1;
+				show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
@@ -202,18 +240,18 @@ void move_cursor_ifneeded(void) {
 			lcd_col = 15;
 			lcd_moveto(0,0);
 			if (page_num == 1) {
-				lcd_stringout(pages[0]);
 				page_num -= 1;
+				show_notes();
 			} else if (page_num == 2) {
-				lcd_stringout(pages[1]);
 				page_num -= 1;
+				show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
 	}
 }
 /* ------------------------------------------------------------------ */
-void change_note_ifneeded(void) {
+/*void change_note_ifneeded(void) {
 	if (encoder_changed) {
 		encoder_changed = 0;
 		if (encoder_changed_up) {
@@ -230,7 +268,7 @@ void change_note_ifneeded(void) {
 			lcd_moveto(0,lcd_col); //move cursor back
 		}
 	}
-}
+}*/
 
 void check_if_select_pressed(void) {
 	unsigned char curadc = adc_sample(0);
@@ -239,8 +277,9 @@ void check_if_select_pressed(void) {
 			int i;
 			for (i = 0; i < NUM_NOTES; i++) {
 				play_note(note_freq[notes[i]]);
+				TCCR1B &= ~((1 << CS11) | (1 << CS10));
 			}
-			TCCR1B &= ~((1 << CS11) | (1 << CS10)); 
+			 
 				
 		}
 }
@@ -253,7 +292,6 @@ void show_initial_screen(void) {
 	_delay_ms(1000);
 	lcd_writecommand(1);
 	lcd_moveto(0,0);
-	lcd_stringout(pages[0]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -270,6 +308,10 @@ void init_TIMER1(void) {
 
 void play_note(unsigned short freq) // in here, configure timer module
 {
+	if (freq == 0) {
+		_delay_ms(500);
+		return;
+	}
 	int ocr1a_val = (16000000/(2*freq)) / 64;
 	OCR1A = ocr1a_val;
 
