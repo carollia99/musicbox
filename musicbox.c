@@ -54,9 +54,7 @@ void variable_delay_us(int);
 void init_TIMER1(void);
 void show_initial_screen(void);
 void move_cursor_ifneeded(void);
-void change_note_ifneeded(void);
 void check_if_select_pressed(void);
-void init_encoder(void);
 void show_notes(void);
 void verify_eeprom(void);
 
@@ -101,8 +99,6 @@ int main(void) {
 		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
 		check_if_select_pressed();
 	}
-
-
 }
 
 void verify_eeprom(void) {
@@ -218,32 +214,6 @@ ISR(PCINT1_vect) {
 		encoder_changed = 1;
 		encoder_old_state = encoder_new_state;
 	}
-}
-
-
-void init_encoder(void) {
-	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
-	PORTC |= (1 << 5);
-	//Get interrupts working for rotary encoder
-	PCICR |= (1 << PCIE1);
-	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
-	sei();
-
-	//get current state of encoder
-	encoderVal = PINC;
-	encoderA = (encoderVal & (1 << 1));
-	encoderB = (encoderVal & (1 << 5));
-
-	if (!encoderB && !encoderA)
-		encoder_old_state = 0;
-	else if (!encoderB && encoderA)
-		encoder_old_state = 1;
-	else if (encoderB && !encoderA)
-		encoder_old_state = 2;
-	else
-		encoder_old_state = 3;
-
-	encoder_new_state = encoder_old_state;
 }
 
 void move_cursor_ifneeded(void) {

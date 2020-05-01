@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <util/delay.h>
+#include <avr/interrupt.h>
 #include "lcd.h"
 #include "encoder.h"
 #define NUM_NOTES 21
@@ -16,6 +17,31 @@ extern unsigned char page_num;
 extern int lcd_col;
 extern unsigned char notes[NUM_NOTES];
 char *letter_notes[NUM_TONES];
+
+void init_encoder(void) {
+	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
+	PORTC |= (1 << 5);
+	//Get interrupts working for rotary encoder
+	PCICR |= (1 << PCIE1);
+	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
+	sei();
+
+	//get current state of encoder
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
+
+	if (!encoderB && !encoderA)
+		encoder_old_state = 0;
+	else if (!encoderB && encoderA)
+		encoder_old_state = 1;
+	else if (encoderB && !encoderA)
+		encoder_old_state = 2;
+	else
+		encoder_old_state = 3;
+
+	encoder_new_state = encoder_old_state;
+}
 
 void change_note_ifneeded(void) {
 	char *p;
