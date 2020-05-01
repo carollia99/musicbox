@@ -16,6 +16,7 @@
 
 #include "lcd.h"
 #include "adc.h"
+#include "encoder.h"
 
 #define NUM_NOTES 21
 #define NUM_TONES 26
@@ -57,6 +58,7 @@ void change_note_ifneeded(void);
 void check_if_select_pressed(void);
 void init_encoder(void);
 void show_notes(void);
+void verify_eeprom(void);
 
 int isr_count = 0;
 int max_count = 0;
@@ -74,12 +76,7 @@ int lcd_col = 1;
 unsigned char page_num = 0; // pages are zero-indexed for my ease
 unsigned char note_num = 0;
 
-unsigned volatile char encoder_new_state, encoder_old_state;
-unsigned volatile char encoder_changed = 0;  // Flag for state change
-unsigned volatile char encoderA, encoderB;
-unsigned volatile char encoderVal;
-unsigned volatile char encoder_changed_up;
-
+//in musicbox.c, make "encoder.h". declare variables extern in encoder.h. declare variables normally in encoder.c
 int main(void) {
 	// Initialize various modules and functions
 	lcd_init();
@@ -292,35 +289,6 @@ void move_cursor_ifneeded(void) {
 	}
 }
 /* ------------------------------------------------------------------ */
-void change_note_ifneeded(void) {
-	char *p;
-	if (encoder_changed) {
-		encoder_changed = 0;
-		if (encoder_changed_up) {
-			int index = notes[note_num]; //numeric value of note (0,13, 17,etc)
-			if (index < NUM_TONES-1) {
-				notes[note_num] = index+1;
-				p = letter_notes[index+1];
-				lcd_writedata(*p); //print out that letter string
-				lcd_writedata(*(p+1));
-				lcd_moveto(1, lcd_col);
-				lcd_writedata(*(p+2));
-				lcd_moveto(0,lcd_col); //move cursor back
-			}
-		} else {
-			int index = notes[note_num]; //numeric value of note (0,13, 17,etc)
-			if (index > 0) {
-				notes[note_num] = index - 1;
-				p = letter_notes[index-1];
-				lcd_writedata(*p);
-				lcd_writedata(*(p+1));
-				lcd_moveto(1, lcd_col);
-				lcd_writedata(*(p+2));
-				lcd_moveto(0,lcd_col);
-			}
-		}
-	}
-}
 
 void check_if_select_pressed(void) {
 	unsigned char curadc = adc_sample(0);
