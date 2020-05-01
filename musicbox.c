@@ -285,11 +285,16 @@ void change_note_ifneeded(void) {
 				lcd_moveto(0,lcd_col); //move cursor back
 			}
 		} else {
-			/*int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-			unsigned char indexnote = notes[index]; //which number note in the tune?
-			unsigned char indexnote = notes[index]; //which number note in the tune?
-			lcd_stringout(letter_notes[indexnote-1]); //print out that letter
-			lcd_moveto(0,lcd_col); //move cursor back*/
+			int index = notes[note_num]; //numeric value of note (0,13, 17,etc)
+			if (index > 0) {
+				notes[note_num] = index - 1;
+				p = letter_notes[index-1];
+				lcd_writedata(*p);
+				lcd_writedata(*(p+1));
+				lcd_moveto(1, lcd_col);
+				lcd_writedata(*(p+2));
+				lcd_moveto(0,lcd_col);
+			}
 		}
 	}
 }
