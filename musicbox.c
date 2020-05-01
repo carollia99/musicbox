@@ -28,7 +28,8 @@ unsigned int note_freq[NUM_TONES] =
 { 0,   131, 139, 147, 156, 165, 176, 185, 196, 208, 220, 233, 247,
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
 
-const char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G4","A","A#","B","C"};
+//char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C"};
+char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A','B','C','C','D','D','E','F','F','G','G','A','A','B','C'};
 
 /* Some sample tunes for testing */
 /*
@@ -114,14 +115,22 @@ int main(void) {
 	  }*/
 	  
 
-	while (1) {
+	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
 		if (encoder_changed) {
 			encoder_changed = 0;
 			if (encoder_changed_up) {
-				lcd_stringout("U");
+				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
+				unsigned char indexnote = notes[index]; //which number note in the tune?
+				pages[page_num][lcd_col] = letter_notes[indexnote+1]; //change the letter to one higher
+				lcd_stringout(letter_notes[indexnote+1]); //print out that letter
+				lcd_moveto(0,lcd_col); //move cursor back
 			} else {
-				lcd_stringout("D");
+				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
+				unsigned char indexnote = notes[index]; //which number note in the tune?
+				pages[page_num][lcd_col] = letter_notes[indexnote-1]; //change the letter to one higher
+				lcd_stringout(letter_notes[indexnote-1]); //print out that letter
+				lcd_moveto(0,lcd_col); //move cursor back
 			}
 		}
 	}
