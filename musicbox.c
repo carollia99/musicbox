@@ -141,7 +141,7 @@ int main(void) {
 
 /*
    Code for initializing TIMER1 and its ISR
-   */
+ */
 
 void init_TIMER1(void) {
 	// enable timer interrupt
@@ -155,27 +155,27 @@ void play_note(unsigned short freq) // in here, configure timer module
 	int ocr1a_val = (16000000/(2*freq)) / 64;
 	OCR1A = ocr1a_val;
 	
-	int max_count = freq;
+	max_count = freq;
 	
 	//prescalar = 64
 	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
 	
-	/*while (1) {
-		if (next_note) {
+	while (1) {
+		if (next_note == 1) {
 			next_note = 0;
 			return;
 		}
-	}*/
+	}
 }
 
 ISR(TIMER1_COMPA_vect)
 {
 	PORTB = PORTB ^ (0b00010000); // invert PB4
-	/*isr_count++;
+	isr_count++;
 	if (isr_count > max_count) {
 		isr_count = 0;
 		next_note = 1;
-	}*/
+	}
 }
 
 /* ------------------------------------------------------------------ */
