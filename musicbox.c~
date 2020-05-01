@@ -27,6 +27,8 @@
 unsigned int note_freq[NUM_TONES] =
 { 0,   131, 139, 147, 156, 165, 176, 185, 196, 208, 220, 233, 247,
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
+	
+const char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G4","A","A#","B","C"};
 
 /* Some sample tunes for testing */
 /*
@@ -45,40 +47,151 @@ unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17
 
 void play_note(unsigned short);
 void variable_delay_us(int);
+void init_TIMER1(void);
+void show_initial_screen(void);
+void move_cursor_ifneeded(void);
+
+int isr_count = 0;
+int max_count = 0;
+volatile int next_note = 0;
+char initial_page[16] = " E E F G G F E >";
+char second_page[16] = "<D C C D E E D >";
+char last_page[16] = "<D              ";
+
+//counting cursor and page
+int lcd_col = 1;
+int page_num = 1;
+
+unsigned volatile char encoder_new_state, encoder_old_state;
+unsigned volatile char encoder_changed = 0;  // Flag for state change
+//int volatile count = 0;		// Count to display
+unsigned volatile char encoderA, encoderB;
+unsigned volatile char encoderVal;
+unsigned volatile char encoder_changed_up;
 
 int main(void) {
-	// Initialize various modules and functions and variables
+	// Initialize various modules and functions
 	lcd_init();
 	adc_init();
 	lcd_writecommand(1);
 	DDRB |= (1 << PB4);
+	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
-	int lcd_col = 1;
-	int page_num = 1;
-	char initial_page[16] = " E E F G G F E >";
-	char second_page[16] = "<D C C D E E D >";
-	char last_page[16] = "<D D D D D D ";
+	init_TIMER1();
 
-	// Show splash screen
-	lcd_stringout("Carol Liang");
-	_delay_ms(1000);
-	lcd_writecommand(1);
-	lcd_moveto(0,0);
-	lcd_stringout("should move");
-	_delay_ms(500);
-	lcd_moveto(0,0);
-	lcd_stringout(initial_page);
+	//rotary encoder
+	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
+	PORTC |= (1 << 5);
+	//Get interrupts working for rotary encoder
+	PCICR |= (1 << PCIE1);
+	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
+	sei();
+	
+	//get current state of encoder
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
 
+	if (!encoderB && !encoderA)
+		encoder_old_state = 0;
+	else if (!encoderB && encoderA)
+		encoder_old_state = 1;
+	else if (encoderB && !encoderA)
+		encoder_old_state = 2;
+	else
+		encoder_old_state = 3;
+
+	encoder_new_state = encoder_old_state;
+
+	show_initial_screen(); // splash screen and initial page
+	lcd_moveto(0,0);
 
 	/*int i;
-	for (i = 0; i < NUM_TONES; i++) {
-		play_note(note_freq[i]);
-	}*/
+	  for (i = 0; i < 21; i++) {
+	  play_note(note_freq[i]);
+	  }
+	  */
 
 	while (1) {
+		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
+		if (encoder_changed) {
+			if (encoder_changed_up) {
+				//make note higher
+			} else {
+				//make note lower
+			}
+		}
+	}
+
+	/* If rotary encoder was rotated, change note tone */
+
+	//}
+
+}
+
+ISR(PCINT1_vect) {
+	encoderVal = PINC;
+	encoderA = (encoderVal && (1 << 1));
+	encoderB = (encoderVal && (1 << 5));
+	
+	if (encoder_old_state == 0) {
+		if (encoderA) {
+			encoder_new_state = 1;
+			encoder_changed_up = 1;
+		}
+		else if (b) {
+			encoder_new_state = 2;
+			encoder_changed_up = 0;
+		}
+		// Handle A and B inputs for state 0
+	}
+	else if (old_state == 1) {
+		if (!a) {
+			encoder_new_state = 0;
+			encoder_changed_up = 0;
+		}
+		else if (b) {
+			encoder_new_state = 3;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 1
+	}
+	else if (encoder_old_state == 2) {
+		if (encoderA) {
+			encoder_new_state = 3;
+			encoder_changed_up = 0;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 0;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 2
+	}
+	else {   // old_state = 3
+		if (!encoderA) {
+			encoder_new_state = 2;
+			encoder_state_up = 1;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 1;
+			encoder_state_up = 0;;
+		}
+		// Handle A and B inputs for state 3
+	}
+
+	// If state changed, update the value of old_state,
+	// and set a flag that the state has changed.
+	if (new_state != old_state) {
+		changed = 1;
+		old_state = new_state;
+	}
+}
+
+void move_cursor_ifneeded(void) {
 		unsigned char curadc = adc_sample(0);
-		/* Check if a button on the LCD was pressed */
-		if (curadc > 0 && curadc < 5) {
+		//check_cursor_move(curadc);
+		//Check if a button on the LCD was pressed
+		if (curadc > 0 && curadc < 30) {
 			_delay_ms(200);
 			lcd_col += 2;
 			if (lcd_col > 15) {
@@ -109,42 +222,59 @@ int main(void) {
 			}
 			lcd_moveto(0, lcd_col);
 		}
-
-		/* If rotary encoder was rotated, change note tone */
-
-	}
-
-	while (1) {                 // Loop forever
-
-
-	}
 }
-
-
 /* ------------------------------------------------------------------ */
 
 /*
    Code for showing notes on the screen and playing the notes.
    */
 
-
-
-
+void show_initial_screen(void) {
+	lcd_stringout("Carol Liang");
+	_delay_ms(1000);
+	lcd_writecommand(1);
+	lcd_moveto(0,0);
+	lcd_stringout(initial_page);
+}
 
 /* ------------------------------------------------------------------ */
 
 /*
    Code for initializing TIMER1 and its ISR
-   */
+*/
+void init_TIMER1(void) {
+	// enable timer interrupt
+	TIMSK1 |= (1 << OCIE1A);
+	TCCR1B |= (1 << WGM12);
+	sei();
+}
 
+void play_note(unsigned short freq) // in here, configure timer module
+{
+	int ocr1a_val = (16000000/(2*freq)) / 64;
+	OCR1A = ocr1a_val;
 
+	max_count = freq;
 
+	//prescalar = 64
+	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
+
+	while (1) {
+		if (next_note == 1) {
+			next_note = 0;
+			return;
+		}
+	}
+}
 
 ISR(TIMER1_COMPA_vect)
 {
-
-
-
+	PORTB = PORTB ^ (0b00010000); // invert PB4
+	isr_count++;
+	if (isr_count > max_count) {
+		isr_count = 0;
+		next_note = 1;
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -153,36 +283,5 @@ ISR(TIMER1_COMPA_vect)
    Code for initializing TIMER2
    */
 
-void play_note(unsigned short freq)
-{
-	unsigned long period;
-
-	period = 1000000 / freq;      // Period of note in microseconds
-
-	while (freq--) {
-		// Make PB4 high
-		PORTB |= (1 << PB4);
-
-		// Use variable_delay_us to delay for half the period
-		variable_delay_us(period/2);
-
-		// Make PB4 low
-		PORTB &= ~(1 << PB4);
-
-		// Delay for half the period again
-		variable_delay_us(period/2);
-	}
-}
-
-/*
-   variable_delay_us - Delay a variable number of microseconds
-   */
-void variable_delay_us(int delay)
-{
-	int i = (delay + 5) / 10;
-
-	while (i--)
-		_delay_us(10);
-}
 
 

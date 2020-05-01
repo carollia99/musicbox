@@ -28,6 +28,8 @@ unsigned int note_freq[NUM_TONES] =
 { 0,   131, 139, 147, 156, 165, 176, 185, 196, 208, 220, 233, 247,
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
 
+const char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G4","A","A#","B","C"};
+
 /* Some sample tunes for testing */
 /*
    The "notes" array is used to store the music that will be played.  Each value
@@ -47,13 +49,25 @@ void play_note(unsigned short);
 void variable_delay_us(int);
 void init_TIMER1(void);
 void show_initial_screen(void);
+void move_cursor_ifneeded(void);
 
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
 char initial_page[16] = " E E F G G F E >";
 char second_page[16] = "<D C C D E E D >";
-char last_page[16] = "<D D D D D D ";
+char last_page[16] = "<D              ";
+
+//counting cursor and page
+int lcd_col = 1;
+int page_num = 1;
+
+unsigned volatile char encoder_new_state, encoder_old_state;
+unsigned volatile char encoder_changed = 0;  // Flag for state change
+//int volatile count = 0;		// Count to display
+unsigned volatile char encoderA, encoderB;
+unsigned volatile char encoderVal;
+unsigned volatile char encoder_changed_up;
 
 int main(void) {
 	// Initialize various modules and functions
@@ -63,72 +77,160 @@ int main(void) {
 	DDRB |= (1 << PB4);
 	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
-	init_TIMER1();
-	
-	//Initialize variables
-	int lcd_col = 1;
-	int page_num = 1;
-	
-	show_initial_screen(); // splash screen and initial page
+	//init_TIMER1();
 
-	int i;
-	for (i = 0; i < 21; i++) {
-		play_note(note_freq[i]);
+	//rotary encoder
+	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
+	PORTC |= (1 << 5);
+	//Get interrupts working for rotary encoder
+	PCICR |= (1 << PCIE1);
+	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
+	sei();
+
+	//get current state of encoder
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
+
+	if (!encoderB && !encoderA)
+		encoder_old_state = 0;
+	else if (!encoderB && encoderA)
+		encoder_old_state = 1;
+	else if (encoderB && !encoderA)
+		encoder_old_state = 2;
+	else
+		encoder_old_state = 3;
+
+	encoder_new_state = encoder_old_state;
+
+	show_initial_screen(); // splash screen and initial page
+	lcd_moveto(0,0);
+
+	/*int i;
+	  for (i = 0; i < 21; i++) {
+	  play_note(note_freq[i]);
+	  }
+	  */
+
+	while (1) {
+		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
+		if (encoder_changed) {
+			lcd_stringout("HI");
+			encoder_changed = 0;
+			if (encoder_changed_up) {
+				lcd_stringout("U");
+			} else {
+				lcd_stringout("D");
+			}
+		}
 	}
 
-	
-	/*while (1) {
-		unsigned char curadc = adc_sample(0);
-		//Check if a button on the LCD was pressed
-		if (curadc > 0 && curadc < 5) {
-			_delay_ms(200);
-			lcd_col += 2;
-			if (lcd_col > 15) {
-				lcd_col = 1;
-				lcd_moveto(0,0);
-				if (page_num == 1) {
-					lcd_stringout(second_page);
-					page_num += 1;
-				} else if (page_num == 2) {
-					lcd_stringout(last_page);
-					page_num += 1;
-				}
-			}
-			lcd_moveto(0, lcd_col);
-		} else if (curadc > 154 && curadc < 160) {
-			_delay_ms(200);
-			lcd_col -= 2;
-			if (lcd_col < 0) {
-				lcd_col = 15;
-				lcd_moveto(0,0);
-				if (page_num == 2) {
-					lcd_stringout(initial_page);
-					page_num -= 1;
-				} else if (page_num == 3) {
-					lcd_stringout(second_page);
-					page_num -= 1;
-				}
-			}
-			lcd_moveto(0, lcd_col);
-		}*/
-
-		/* If rotary encoder was rotated, change note tone */
+	/* If rotary encoder was rotated, change note tone */
 
 	//}
 
-	while (1) {                 // Loop forever
+}
 
+ISR(PCINT1_vect) {
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
 
+	if (encoder_old_state == 0) {
+		if (encoderA) {
+			encoder_new_state = 1;
+			encoder_changed_up = 1;
+		}
+		else if (encoderB) {
+			encoder_new_state = 2;
+			encoder_changed_up = 0;
+		}
+		// Handle A and B inputs for state 0
+	}
+	else if (encoder_old_state == 1) {
+		if (!encoderA) {
+			encoder_new_state = 0;
+			encoder_changed_up = 0;
+		}
+		else if (encoderB) {
+			encoder_new_state = 3;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 1
+	}
+	else if (encoder_old_state == 2) {
+		if (encoderA) {
+			encoder_new_state = 3;
+			encoder_changed_up = 0;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 0;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 2
+	}
+	else {   // old_state = 3
+		if (!encoderA) {
+			encoder_new_state = 2;
+			encoder_changed_up = 1;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 1;
+			encoder_changed_up = 0;
+		}
+		// Handle A and B inputs for state 3
+	}
+
+	// If state changed, update the value of old_state,
+	// and set a flag that the state has changed.
+	if (encoder_new_state != encoder_old_state) {
+		encoder_changed = 1;
+		encoder_old_state = encoder_new_state;
 	}
 }
 
-
+void move_cursor_ifneeded(void) {
+	unsigned char curadc = adc_sample(0);
+	//check_cursor_move(curadc);
+	//Check if a button on the LCD was pressed
+	if (curadc > 0 && curadc < 30) {
+		_delay_ms(200);
+		lcd_col += 2;
+		if (lcd_col > 15) {
+			lcd_col = 1;
+			lcd_moveto(0,0);
+			if (page_num == 1) {
+				lcd_stringout(second_page);
+				page_num += 1;
+			} else if (page_num == 2) {
+				lcd_stringout(last_page);
+				page_num += 1;
+			}
+		}
+		lcd_moveto(0, lcd_col);
+	} else if (curadc > 154 && curadc < 160) {
+		_delay_ms(200);
+		lcd_col -= 2;
+		if (lcd_col < 0) {
+			lcd_col = 15;
+			lcd_moveto(0,0);
+			if (page_num == 2) {
+				lcd_stringout(initial_page);
+				page_num -= 1;
+			} else if (page_num == 3) {
+				lcd_stringout(second_page);
+				page_num -= 1;
+			}
+		}
+		lcd_moveto(0, lcd_col);
+	}
+}
 /* ------------------------------------------------------------------ */
 
 /*
    Code for showing notes on the screen and playing the notes.
    */
-   
+
 void show_initial_screen(void) {
 	lcd_stringout("Carol Liang");
 	_delay_ms(1000);
@@ -141,8 +243,7 @@ void show_initial_screen(void) {
 
 /*
    Code for initializing TIMER1 and its ISR
- */
-
+   */
 void init_TIMER1(void) {
 	// enable timer interrupt
 	TIMSK1 |= (1 << OCIE1A);
@@ -154,12 +255,12 @@ void play_note(unsigned short freq) // in here, configure timer module
 {
 	int ocr1a_val = (16000000/(2*freq)) / 64;
 	OCR1A = ocr1a_val;
-	
+
 	max_count = freq;
-	
+
 	//prescalar = 64
 	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
-	
+
 	while (1) {
 		if (next_note == 1) {
 			next_note = 0;
