@@ -54,13 +54,15 @@ void move_cursor_ifneeded(void);
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
-char initial_page[16] = " E E F G G F E >";
-char second_page[16] = "<D C C D E E D >";
-char last_page[16] = "<D              ";
+
+char pages[3][16] = {" E E F G G F E >",
+					 "<D C C D E E D >",
+					 "<D              "};
 
 //counting cursor and page
 int lcd_col = 1;
-int page_num = 1;
+//int page_num = 1;
+int page_num = 0; // pages are zero-indexed for my ease
 
 unsigned volatile char encoder_new_state, encoder_old_state;
 unsigned volatile char encoder_changed = 0;  // Flag for state change
@@ -77,7 +79,7 @@ int main(void) {
 	DDRB |= (1 << PB4);
 	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
-	//init_TIMER1();
+	init_TIMER1();
 
 	//rotary encoder
 	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
@@ -104,18 +106,17 @@ int main(void) {
 	encoder_new_state = encoder_old_state;
 
 	show_initial_screen(); // splash screen and initial page
-	lcd_moveto(0,0);
+	lcd_moveto(0,1);
 
 	/*int i;
 	  for (i = 0; i < 21; i++) {
 	  play_note(note_freq[i]);
-	  }
-	  */
+	  }*/
+	  
 
 	while (1) {
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
 		if (encoder_changed) {
-			lcd_stringout("HI");
 			encoder_changed = 0;
 			if (encoder_changed_up) {
 				lcd_stringout("U");
@@ -199,11 +200,11 @@ void move_cursor_ifneeded(void) {
 		if (lcd_col > 15) {
 			lcd_col = 1;
 			lcd_moveto(0,0);
-			if (page_num == 1) {
-				lcd_stringout(second_page);
+			if (page_num == 0) {
+				lcd_stringout(pages[1]);
 				page_num += 1;
-			} else if (page_num == 2) {
-				lcd_stringout(last_page);
+			} else if (page_num == 1) {
+				lcd_stringout(pages[2]);
 				page_num += 1;
 			}
 		}
@@ -214,11 +215,11 @@ void move_cursor_ifneeded(void) {
 		if (lcd_col < 0) {
 			lcd_col = 15;
 			lcd_moveto(0,0);
-			if (page_num == 2) {
-				lcd_stringout(initial_page);
+			if (page_num == 1) {
+				lcd_stringout(pages[0]);
 				page_num -= 1;
-			} else if (page_num == 3) {
-				lcd_stringout(second_page);
+			} else if (page_num == 2) {
+				lcd_stringout(pages[1]);
 				page_num -= 1;
 			}
 		}
@@ -236,7 +237,7 @@ void show_initial_screen(void) {
 	_delay_ms(1000);
 	lcd_writecommand(1);
 	lcd_moveto(0,0);
-	lcd_stringout(initial_page);
+	lcd_stringout(pages[0]);
 }
 
 /* ------------------------------------------------------------------ */
