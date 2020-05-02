@@ -12,6 +12,11 @@ COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 # symbolic targets:
 all:	main.hex
 
+musicbox.o: musicbox.c lcd.h adc.h encoder.h
+lcd.o: lcd.c lcd.h 
+encoder.o: encoder.c lcd.h
+adc.o: adc.c
+
 .c.o:
 	$(COMPILE) -c $< -o $@
 

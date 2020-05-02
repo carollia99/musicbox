@@ -151,11 +151,11 @@ void move_cursor_ifneeded(void) {
 			lcd_moveto(0,0);
 			if (page_num == 1) {
 				page_num -= 1;
-				note_num = page_num * 7 + 8;
+				note_num = page_num * 7 + 7;
 				lcd_show_notes();
 			} else if (page_num == 2) {
 				page_num -= 1;
-				note_num = page_num * 7 + 8;
+				note_num = page_num * 7 + 7;
 				lcd_show_notes();
 			}
 		}
@@ -167,13 +167,15 @@ void move_cursor_ifneeded(void) {
 void check_if_select_pressed(void) {
 	unsigned char curadc = adc_sample(0);
 	if (curadc > 205 && curadc < 215) {
-		DDRB |= (1 << PB3);
 		_delay_ms(200);
+		DDRB |= (1 << PB3);
 		int i;
 		for (i = 0; i < NUM_NOTES; i++) {
+			OCR2A = (400*i)/NUM_NOTES;
 			play_note(note_freq[notes[i]]);
 			TCCR1B &= ~((1 << CS11) | (1 << CS10));
 		}
+		DDRB &= ~(1 << PB3);
 		eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 		eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 	}
@@ -211,7 +213,6 @@ void play_note(unsigned short freq) // in here, configure timer module
 	OCR1A = ocr1a_val;
 
 	max_count = freq;
-	OCR2A = freq;
 
 	//prescalar = 64
 	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
@@ -235,8 +236,8 @@ ISR(TIMER1_COMPA_vect)
 }
 
 void init_TIMER2(void) {
-	OCR2A = 255;
-	TCCR2A |= ((1 << WGM21) | (1 << WGM20)); // fast PWM 
+	//OCR2A = 255;
+	TCCR2A |= ((1 << WGM21) | (1 << WGM20) | (1 << COM2A1)); // | (1 << COM2A0)); // fast PWM 
 	TCCR2B |= ((1 << CS20)); // prescalar of 1
 	sei();
 	//Set WGMx[2:0] bits for Fast PWM

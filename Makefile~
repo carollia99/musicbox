@@ -1,7 +1,7 @@
 DEVICE     = atmega328p
 CLOCK      = 16000000
 PROGRAMMER = -c arduino -b 115200 -P COM4
-OBJECTS    = musicbox.o lcd.o acd.o
+OBJECTS    = musicbox.o lcd.o adc.o encoder.o
 FUSES      = -U hfuse:w:0xde:m -U lfuse:w:0xff:m -U efuse:w:0x05:m
 
 # Tune the lines below only if you know what you are doing:
@@ -11,6 +11,11 @@ COMPILE = avr-gcc -Wall -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
 # symbolic targets:
 all:	main.hex
+
+musicbox.o: musicbox.c lcd.h acd.h encoder.h
+lcd.o: lcd.c lcd.h 
+encoder.o: encoder.c lcd.h
+adc.o: adc.c
 
 .c.o:
 	$(COMPILE) -c $< -o $@
