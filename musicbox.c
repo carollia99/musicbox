@@ -70,7 +70,6 @@ char pages[48];
 
 //counting cursor and page
 int lcd_col = 1;
-//int page_num = 1;
 unsigned char page_num = 0; // pages are zero-indexed for my ease
 unsigned char note_num = 0;
 
@@ -85,11 +84,21 @@ int main(void) {
 	PORTC |= ((1 << 1) | (1 << 5));
 	init_TIMER1();
 	init_encoder(); //rotary encoder
+	//LED
+	DDRB |= (1 << PB3);
+	PORTB &= ~( 1 << 3);
 	
-	//check if all values stored in eeprom work. If not, notes takes default state
-	verify_eeprom();
+	//check factory reset
+	unsigned char curadc = adc_sample(0);
+	if (curadc > 250) {
+		//check if all values stored in eeprom work. If not, notes takes default state
+		verify_eeprom();
+	}
+	
+	//verify_eeprom();
 	
 	//show_initial_screen(); // splash screen
+	show_initial_screen();
 	show_notes();
 	lcd_moveto(0,1);
 	
@@ -103,17 +112,14 @@ int main(void) {
 
 void verify_eeprom(void) {
 	char eeprom_good = 1;
-
 	eeprom_read_block(testnotes, (void *) EEPROM_ADDRESS, NUM_NOTES);
-	unsigned char *c = testnotes;
-	
-	while (*c != '\0') {
-		if (*c < 0 || *c > 25) {
+
+	int i;
+	for (i = 0; i < NUM_NOTES; i++) {
+		if (testnotes[i] == 0xFF || testnotes[i] < 0 || testnotes[i] > 25) {
 			eeprom_good = 0;
-			return;
+			break;
 		}
-		lcd_writedata(*c);
-		*c++;
 	}
 
 	if (eeprom_good) {
@@ -151,13 +157,6 @@ void show_notes(void) {
 	}
 }
 
-void move_cursor() {
-	unsigned char curadc = adc_sample(0);
-	if (curadc > 0 && curadc < 30) {
-		_delay_ms(200);
-	}
-	
-}
 ISR(PCINT1_vect) {
 	encoderVal = PINC;
 	encoderA = (encoderVal & (1 << 1));
