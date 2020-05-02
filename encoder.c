@@ -72,3 +72,61 @@ void change_note_ifneeded(void) {
 		}
 	}
 }
+
+ISR(PCINT1_vect) {
+	encoderVal = PINC;
+	encoderA = (encoderVal & (1 << 1));
+	encoderB = (encoderVal & (1 << 5));
+
+	if (encoder_old_state == 0) {
+		if (encoderA) {
+			encoder_new_state = 1;
+			encoder_changed_up = 1;
+		}
+		else if (encoderB) {
+			encoder_new_state = 2;
+			encoder_changed_up = 0;
+		}
+		// Handle A and B inputs for state 0
+	}
+	else if (encoder_old_state == 1) {
+		if (!encoderA) {
+			encoder_new_state = 0;
+			encoder_changed_up = 0;
+		}
+		else if (encoderB) {
+			encoder_new_state = 3;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 1
+	}
+	else if (encoder_old_state == 2) {
+		if (encoderA) {
+			encoder_new_state = 3;
+			encoder_changed_up = 0;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 0;
+			encoder_changed_up = 1;
+		}
+		// Handle A and B inputs for state 2
+	}
+	else {   // old_state = 3
+		if (!encoderA) {
+			encoder_new_state = 2;
+			encoder_changed_up = 1;
+		}
+		else if (!encoderB) {
+			encoder_new_state = 1;
+			encoder_changed_up = 0;
+		}
+		// Handle A and B inputs for state 3
+	}
+
+	// If state changed, update the value of old_state,
+	// and set a flag that the state has changed.
+	if (encoder_new_state != encoder_old_state) {
+		encoder_changed = 1;
+		encoder_old_state = encoder_new_state;
+	}
+}

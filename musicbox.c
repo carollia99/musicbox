@@ -89,8 +89,8 @@ int main(void) {
 	PORTB &= ~( 1 << 3);
 	
 	//check factory reset
-	unsigned char curadc = adc_sample(0);
-	if (curadc > 250) {
+	unsigned char adcval = adc_sample(0);
+	if (adcval > 250) {
 		//check if all values stored in eeprom work. If not, notes takes default state
 		verify_eeprom();
 	}
@@ -157,69 +157,12 @@ void show_notes(void) {
 	}
 }
 
-ISR(PCINT1_vect) {
-	encoderVal = PINC;
-	encoderA = (encoderVal & (1 << 1));
-	encoderB = (encoderVal & (1 << 5));
-
-	if (encoder_old_state == 0) {
-		if (encoderA) {
-			encoder_new_state = 1;
-			encoder_changed_up = 1;
-		}
-		else if (encoderB) {
-			encoder_new_state = 2;
-			encoder_changed_up = 0;
-		}
-		// Handle A and B inputs for state 0
-	}
-	else if (encoder_old_state == 1) {
-		if (!encoderA) {
-			encoder_new_state = 0;
-			encoder_changed_up = 0;
-		}
-		else if (encoderB) {
-			encoder_new_state = 3;
-			encoder_changed_up = 1;
-		}
-		// Handle A and B inputs for state 1
-	}
-	else if (encoder_old_state == 2) {
-		if (encoderA) {
-			encoder_new_state = 3;
-			encoder_changed_up = 0;
-		}
-		else if (!encoderB) {
-			encoder_new_state = 0;
-			encoder_changed_up = 1;
-		}
-		// Handle A and B inputs for state 2
-	}
-	else {   // old_state = 3
-		if (!encoderA) {
-			encoder_new_state = 2;
-			encoder_changed_up = 1;
-		}
-		else if (!encoderB) {
-			encoder_new_state = 1;
-			encoder_changed_up = 0;
-		}
-		// Handle A and B inputs for state 3
-	}
-
-	// If state changed, update the value of old_state,
-	// and set a flag that the state has changed.
-	if (encoder_new_state != encoder_old_state) {
-		encoder_changed = 1;
-		encoder_old_state = encoder_new_state;
-	}
-}
 
 void move_cursor_ifneeded(void) {
 	unsigned char curadc = adc_sample(0);
 	//check_cursor_move(curadc);
 	//Check if a button on the LCD was pressed
-	if (curadc > 0 && curadc < 30) {
+	if ((curadc > 0 && curadc < 30) || (curadc > 45 && curadc < 60)) {
 		_delay_ms(200);
 		lcd_col += 2;
 		note_num += 1;
@@ -237,7 +180,7 @@ void move_cursor_ifneeded(void) {
 			}
 		}
 		lcd_moveto(0, lcd_col);
-	} else if (curadc > 154 && curadc < 160) {
+	} else if ((curadc > 154 && curadc < 160) || (curadc > 95 && curadc < 115)) {
 		_delay_ms(200);
 		lcd_col -= 2;
 		note_num -= 1;
@@ -326,8 +269,8 @@ ISR(TIMER1_COMPA_vect)
 	}
 }
 
-/* ------------------------------------------------------------------ */
-
+void init_TIMER2(void) {
+}
 /*
    Code for initializing TIMER2
    */
