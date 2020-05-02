@@ -12,12 +12,15 @@
 #include <avr/interrupt.h>
 #include <avr/eeprom.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "lcd.h"
 #include "adc.h"
+#include "encoder.h"
 
 #define NUM_NOTES 21
 #define NUM_TONES 26
+#define EEPROM_ADDRESS 100
 
 /*
    The note_freq array contains the frequencies of the notes from C3 to C5 in
@@ -28,8 +31,7 @@ unsigned int note_freq[NUM_TONES] =
 { 0,   131, 139, 147, 156, 165, 176, 185, 196, 208, 220, 233, 247,
 	262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494, 523};
 
-//char *letter_notes[NUM_TONES] = {" ","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C","C#","D","D#","E","F","F#","G","G#","A","A#","B","C"};
-char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A','B','C','C','D','D','E','F','F','G','G','A','A','B','C'};
+char *letter_notes[NUM_TONES] = {"   ","C 3","C#3","D 3","D#3","E 3","F 3","F#3","G 3","G#3","A 3","A#3","B 3","C 4","C#4","D 4","D#4","E 4","F 4","F#4","G 4","G#4","A 4","A#4","B 4","C 5"};
 
 /* Some sample tunes for testing */
 /*
@@ -44,33 +46,28 @@ char letter_notes[NUM_TONES] = {' ','C','C','D','D','E','F','F','G','G','A','A',
 //unsigned char notes[NUM_NOTES] = {15, 15, 12, 13, 10, 12, 8, 7, 5, 3, 10, 13, 10, 12};
 
 // E E F G G F E D C C D E E D D   Ode to Joy
-unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15 };
+unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15, 0, 0, 0, 0, 0, 0 };
+unsigned char testnotes[NUM_NOTES];
 
 void play_note(unsigned short);
 void variable_delay_us(int);
 void init_TIMER1(void);
+void init_TIMER2(void);
 void show_initial_screen(void);
 void move_cursor_ifneeded(void);
+void check_if_select_pressed(void);
+void verify_eeprom(void);
 
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
 
-char pages[3][16] = {" E E F G G F E >",
-					 "<D C C D E E D >",
-					 "<D              "};
-
 //counting cursor and page
 int lcd_col = 1;
-//int page_num = 1;
-int page_num = 0; // pages are zero-indexed for my ease
+unsigned char page_num = 0; // pages are zero-indexed for my ease
+unsigned char note_num = 0;
 
-unsigned volatile char encoder_new_state, encoder_old_state;
-unsigned volatile char encoder_changed = 0;  // Flag for state change
-unsigned volatile char encoderA, encoderB;
-unsigned volatile char encoderVal;
-unsigned volatile char encoder_changed_up;
-
+//in musicbox.c, make "encoder.h". declare variables extern in encoder.h. declare variables normally in encoder.c
 int main(void) {
 	// Initialize various modules and functions
 	lcd_init();
@@ -80,162 +77,105 @@ int main(void) {
 	PORTB = 0;
 	PORTC |= ((1 << 1) | (1 << 5));
 	init_TIMER1();
-
-	//rotary encoder
-	PORTC |= (1 << 1); // enable pull-up resistors for rotary encoder
-	PORTC |= (1 << 5);
-	//Get interrupts working for rotary encoder
-	PCICR |= (1 << PCIE1);
-	PCMSK1 |= ((1 << PCINT9) | (1 << PCINT13));
-	sei();
-
-	//get current state of encoder
-	encoderVal = PINC;
-	encoderA = (encoderVal & (1 << 1));
-	encoderB = (encoderVal & (1 << 5));
-
-	if (!encoderB && !encoderA)
-		encoder_old_state = 0;
-	else if (!encoderB && encoderA)
-		encoder_old_state = 1;
-	else if (encoderB && !encoderA)
-		encoder_old_state = 2;
-	else
-		encoder_old_state = 3;
-
-	encoder_new_state = encoder_old_state;
-
-	show_initial_screen(); // splash screen and initial page
+	init_encoder(); //rotary encoder
+	
+	//LED
+	init_TIMER2();
+	
+	//check factory reset
+	unsigned char adcval = adc_sample(0);
+	if (adcval > 250) {
+		//check if all values stored in eeprom work. If not, notes takes default state
+		verify_eeprom();
+	}
+	
+	// splash screen and initial screen
+	show_initial_screen();
+	lcd_show_notes();
 	lcd_moveto(0,1);
-
-	/*int i;
-	  for (i = 0; i < 21; i++) {
-	  play_note(note_freq[i]);
-	  }*/
-	  
+	
 
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
-		change_note_ifneeded();
-	}
-
-	/* If rotary encoder was rotated, change note tone */
-
-	//}
-
-}
-
-ISR(PCINT1_vect) {
-	encoderVal = PINC;
-	encoderA = (encoderVal & (1 << 1));
-	encoderB = (encoderVal & (1 << 5));
-
-	if (encoder_old_state == 0) {
-		if (encoderA) {
-			encoder_new_state = 1;
-			encoder_changed_up = 1;
-		}
-		else if (encoderB) {
-			encoder_new_state = 2;
-			encoder_changed_up = 0;
-		}
-		// Handle A and B inputs for state 0
-	}
-	else if (encoder_old_state == 1) {
-		if (!encoderA) {
-			encoder_new_state = 0;
-			encoder_changed_up = 0;
-		}
-		else if (encoderB) {
-			encoder_new_state = 3;
-			encoder_changed_up = 1;
-		}
-		// Handle A and B inputs for state 1
-	}
-	else if (encoder_old_state == 2) {
-		if (encoderA) {
-			encoder_new_state = 3;
-			encoder_changed_up = 0;
-		}
-		else if (!encoderB) {
-			encoder_new_state = 0;
-			encoder_changed_up = 1;
-		}
-		// Handle A and B inputs for state 2
-	}
-	else {   // old_state = 3
-		if (!encoderA) {
-			encoder_new_state = 2;
-			encoder_changed_up = 1;
-		}
-		else if (!encoderB) {
-			encoder_new_state = 1;
-			encoder_changed_up = 0;
-		}
-		// Handle A and B inputs for state 3
-	}
-
-	// If state changed, update the value of old_state,
-	// and set a flag that the state has changed.
-	if (encoder_new_state != encoder_old_state) {
-		encoder_changed = 1;
-		encoder_old_state = encoder_new_state;
+		change_note_ifneeded(); // if rotary encoder was rotated, change note tone 
+		check_if_select_pressed();
 	}
 }
+
+void verify_eeprom(void) {
+	char eeprom_good = 1;
+	eeprom_read_block(testnotes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+
+	int i;
+	for (i = 0; i < NUM_NOTES; i++) {
+		if (testnotes[i] == 0xFF || testnotes[i] < 0 || testnotes[i] > 25) {
+			eeprom_good = 0;
+			break;
+		}
+	}
+
+	if (eeprom_good) {
+		strncpy(notes, testnotes, NUM_NOTES);
+	} 
+}
+
 
 void move_cursor_ifneeded(void) {
 	unsigned char curadc = adc_sample(0);
 	//check_cursor_move(curadc);
 	//Check if a button on the LCD was pressed
-	if (curadc > 0 && curadc < 30) {
+	if ((curadc > 0 && curadc < 30) || (curadc > 45 && curadc < 60)) {
 		_delay_ms(200);
 		lcd_col += 2;
+		note_num += 1;
 		if (lcd_col > 15) {
 			lcd_col = 1;
 			lcd_moveto(0,0);
 			if (page_num == 0) {
-				lcd_stringout(pages[1]);
 				page_num += 1;
+				note_num = page_num * 7;
+				lcd_show_notes();
 			} else if (page_num == 1) {
-				lcd_stringout(pages[2]);
 				page_num += 1;
+				note_num = page_num * 7;
+				lcd_show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
-	} else if (curadc > 154 && curadc < 160) {
+	} else if ((curadc > 154 && curadc < 160) || (curadc > 95 && curadc < 115)) {
 		_delay_ms(200);
 		lcd_col -= 2;
+		note_num -= 1;
 		if (lcd_col < 0) {
 			lcd_col = 15;
 			lcd_moveto(0,0);
 			if (page_num == 1) {
-				lcd_stringout(pages[0]);
 				page_num -= 1;
+				note_num = page_num * 7 + 8;
+				lcd_show_notes();
 			} else if (page_num == 2) {
-				lcd_stringout(pages[1]);
 				page_num -= 1;
+				note_num = page_num * 7 + 8;
+				lcd_show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
 	}
 }
 /* ------------------------------------------------------------------ */
-void change_note_ifneeded(void) {
-	if (encoder_changed) {
-			encoder_changed = 0;
-			if (encoder_changed_up) {
-				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-				unsigned char indexnote = notes[index]; //which number note in the tune?
-				pages[page_num][lcd_col] = letter_notes[indexnote+1]; //change the letter to one higher
-				lcd_stringout(letter_notes[indexnote+1]); //print out that letter
-				lcd_moveto(0,lcd_col); //move cursor back
-			} else {
-				int index = ((15*page_num + lcd_col)/2) - page_num; //index of cursor in relation to all indices of pages
-				unsigned char indexnote = notes[index]; //which number note in the tune?
-				pages[page_num][lcd_col] = letter_notes[indexnote-1]; //change the letter to one higher
-				lcd_stringout(letter_notes[indexnote-1]); //print out that letter
-				lcd_moveto(0,lcd_col); //move cursor back
+
+void check_if_select_pressed(void) {
+	unsigned char curadc = adc_sample(0);
+		if (curadc > 205 && curadc < 215) {
+			DDRB |= (1 << PB3);
+			_delay_ms(200);
+			int i;
+			for (i = 0; i < NUM_NOTES; i++) {
+				play_note(note_freq[notes[i]]);
+				TCCR1B &= ~((1 << CS11) | (1 << CS10));
 			}
+			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 		}
 }
 /*
@@ -247,7 +187,6 @@ void show_initial_screen(void) {
 	_delay_ms(1000);
 	lcd_writecommand(1);
 	lcd_moveto(0,0);
-	lcd_stringout(pages[0]);
 }
 
 /* ------------------------------------------------------------------ */
@@ -264,10 +203,15 @@ void init_TIMER1(void) {
 
 void play_note(unsigned short freq) // in here, configure timer module
 {
+	if (freq == 0) {
+		_delay_ms(500);
+		return;
+	}
 	int ocr1a_val = (16000000/(2*freq)) / 64;
 	OCR1A = ocr1a_val;
 
 	max_count = freq;
+	OCR2A = freq;
 
 	//prescalar = 64
 	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
@@ -290,8 +234,13 @@ ISR(TIMER1_COMPA_vect)
 	}
 }
 
-/* ------------------------------------------------------------------ */
-
+void init_TIMER2(void) {
+	OCR2A = 255;
+	TCCR2A |= ((1 << WGM21) | (1 << WGM20)); // fast PWM 
+	TCCR2B |= ((1 << CS20)); // prescalar of 1
+	sei();
+	//Set WGMx[2:0] bits for Fast PWM
+}
 /*
    Code for initializing TIMER2
    */

@@ -21,7 +21,7 @@ void lcd_writenibble(unsigned char);
 /*
    lcd_init - Do various things to initialize the LCD display
    */
-
+   
 extern unsigned char page_num;
 extern int lcd_col;
 extern unsigned char notes[NUM_NOTES];
@@ -35,7 +35,7 @@ void lcd_show_notes(void) {
 	lcd_writecommand(1);
 	lcd_moveto(1,0);
 	lcd_writedata(page_num + '1');
-
+	
 	if (page_num == 0 || page_num == 1) {
 		lcd_moveto(0,15);
 		lcd_writedata('>');

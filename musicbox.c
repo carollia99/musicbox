@@ -52,6 +52,7 @@ unsigned char testnotes[NUM_NOTES];
 void play_note(unsigned short);
 void variable_delay_us(int);
 void init_TIMER1(void);
+void init_TIMER2(void);
 void show_initial_screen(void);
 void move_cursor_ifneeded(void);
 void check_if_select_pressed(void);
@@ -60,12 +61,6 @@ void verify_eeprom(void);
 int isr_count = 0;
 int max_count = 0;
 volatile int next_note = 0;
-
-char pages[48];
-	
-//one d character array, read characters in when arduino loads
-//letter_notes is strings - three characters for string
-//share location. 
 
 //counting cursor and page
 int lcd_col = 1;
@@ -83,22 +78,22 @@ int main(void) {
 	PORTC |= ((1 << 1) | (1 << 5));
 	init_TIMER1();
 	init_encoder(); //rotary encoder
+
 	//LED
-	DDRB |= (1 << PB3);
-	PORTB &= ~( 1 << 3);
-	
+	init_TIMER2();
+
 	//check factory reset
 	unsigned char adcval = adc_sample(0);
 	if (adcval > 250) {
 		//check if all values stored in eeprom work. If not, notes takes default state
 		verify_eeprom();
 	}
-	
+
 	// splash screen and initial screen
 	show_initial_screen();
 	lcd_show_notes();
 	lcd_moveto(0,1);
-	
+
 
 	while (1) { //TODO: rotary encoder bugs
 		move_cursor_ifneeded(); // polls checks if button on LCD is pressed, moves cursor/pages
@@ -171,16 +166,17 @@ void move_cursor_ifneeded(void) {
 
 void check_if_select_pressed(void) {
 	unsigned char curadc = adc_sample(0);
-		if (curadc > 205 && curadc < 215) {
-			_delay_ms(200);
-			int i;
-			for (i = 0; i < NUM_NOTES; i++) {
-				play_note(note_freq[notes[i]]);
-				TCCR1B &= ~((1 << CS11) | (1 << CS10));
-			}
-			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
-			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+	if (curadc > 205 && curadc < 215) {
+		DDRB |= (1 << PB3);
+		_delay_ms(200);
+		int i;
+		for (i = 0; i < NUM_NOTES; i++) {
+			play_note(note_freq[notes[i]]);
+			TCCR1B &= ~((1 << CS11) | (1 << CS10));
 		}
+		eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+		eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
+	}
 }
 /*
    Code for showing notes on the screen and playing the notes.
@@ -215,6 +211,7 @@ void play_note(unsigned short freq) // in here, configure timer module
 	OCR1A = ocr1a_val;
 
 	max_count = freq;
+	OCR2A = freq;
 
 	//prescalar = 64
 	TCCR1B |= ((1 << CS11) | (1 << CS10)); 
@@ -238,6 +235,11 @@ ISR(TIMER1_COMPA_vect)
 }
 
 void init_TIMER2(void) {
+	OCR2A = 255;
+	TCCR2A |= ((1 << WGM21) | (1 << WGM20)); // fast PWM 
+	TCCR2B |= ((1 << CS20)); // prescalar of 1
+	sei();
+	//Set WGMx[2:0] bits for Fast PWM
 }
 /*
    Code for initializing TIMER2
