@@ -55,7 +55,6 @@ void init_TIMER1(void);
 void show_initial_screen(void);
 void move_cursor_ifneeded(void);
 void check_if_select_pressed(void);
-void show_notes(void);
 void verify_eeprom(void);
 
 int isr_count = 0;
@@ -95,11 +94,9 @@ int main(void) {
 		verify_eeprom();
 	}
 	
-	//verify_eeprom();
-	
-	//show_initial_screen(); // splash screen
+	// splash screen and initial screen
 	show_initial_screen();
-	show_notes();
+	lcd_show_notes();
 	lcd_moveto(0,1);
 	
 
@@ -127,36 +124,6 @@ void verify_eeprom(void) {
 	} 
 }
 
-void show_notes(void) {
-	unsigned char n = page_num * 7;
-	unsigned char note;
-	char *p;
-	int i;
-	lcd_writecommand(1);
-	lcd_moveto(1,0);
-	lcd_writedata(page_num + '1');
-	
-	if (page_num == 0 || page_num == 1) {
-		lcd_moveto(0,15);
-		lcd_writedata('>');
-	}
-	if (page_num == 1 || page_num == 2) {
-		lcd_moveto(0,0);
-		lcd_writedata('<');
-	}
-
-	for (i = 0; i < 7; i++) {
-		note = notes[n];
-		p = letter_notes[note];
-		lcd_moveto(0, i*2+1);
-		lcd_writedata(*p);
-		lcd_writedata(*(p+1));
-		lcd_moveto(1, i*2+1);
-		lcd_writedata(*(p+2));
-		n++;
-	}
-}
-
 
 void move_cursor_ifneeded(void) {
 	unsigned char curadc = adc_sample(0);
@@ -172,11 +139,11 @@ void move_cursor_ifneeded(void) {
 			if (page_num == 0) {
 				page_num += 1;
 				note_num = page_num * 7;
-				show_notes();
+				lcd_show_notes();
 			} else if (page_num == 1) {
 				page_num += 1;
 				note_num = page_num * 7;
-				show_notes();
+				lcd_show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
@@ -190,11 +157,11 @@ void move_cursor_ifneeded(void) {
 			if (page_num == 1) {
 				page_num -= 1;
 				note_num = page_num * 7 + 8;
-				show_notes();
+				lcd_show_notes();
 			} else if (page_num == 2) {
 				page_num -= 1;
 				note_num = page_num * 7 + 8;
-				show_notes();
+				lcd_show_notes();
 			}
 		}
 		lcd_moveto(0, lcd_col);
@@ -211,6 +178,7 @@ void check_if_select_pressed(void) {
 				play_note(note_freq[notes[i]]);
 				TCCR1B &= ~((1 << CS11) | (1 << CS10));
 			}
+			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 			eeprom_update_block(notes, (void *) EEPROM_ADDRESS, NUM_NOTES);
 		}
 }

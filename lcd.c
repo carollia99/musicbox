@@ -14,10 +14,49 @@ void lcd_writenibble(unsigned char);
 /* Define a couple of masks for the bits in Port B and Port D */
 #define DATA_BITS ((1 << PD7)|(1 << PD6)|(1 << PD5)|(1 << PD4))
 #define CTRL_BITS ((1 << PB1)|(1 << PB0))
+#define NUM_NOTES 21
+#define NUM_TONES 26
+#define EEPROM_ADDRESS 100
 
 /*
    lcd_init - Do various things to initialize the LCD display
    */
+   
+extern unsigned char page_num;
+extern int lcd_col;
+extern unsigned char notes[NUM_NOTES];
+extern char *letter_notes[NUM_TONES];
+
+void lcd_show_notes(void) {
+	unsigned char n = page_num * 7;
+	unsigned char note;
+	char *p;
+	int i;
+	lcd_writecommand(1);
+	lcd_moveto(1,0);
+	lcd_writedata(page_num + '1');
+	
+	if (page_num == 0 || page_num == 1) {
+		lcd_moveto(0,15);
+		lcd_writedata('>');
+	}
+	if (page_num == 1 || page_num == 2) {
+		lcd_moveto(0,0);
+		lcd_writedata('<');
+	}
+
+	for (i = 0; i < 7; i++) {
+		note = notes[n];
+		p = letter_notes[note];
+		lcd_moveto(0, i*2+1);
+		lcd_writedata(*p);
+		lcd_writedata(*(p+1));
+		lcd_moveto(1, i*2+1);
+		lcd_writedata(*(p+2));
+		n++;
+	}
+}
+
 void lcd_init(void)
 {
 	DDRB |= (1 << DDB0);         // Set the DDR register bits for ports B and D
