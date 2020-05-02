@@ -43,10 +43,10 @@ char *letter_notes[NUM_TONES] = {"   ","C 3","C#3","D 3","D#3","E 3","F 3","F#3"
 //unsigned char notes[NUM_NOTES] = {20, 22, 18, 6, 13};
 
 // D D B C A B G F# E D A C A B    Fight On
-//unsigned char notes[NUM_NOTES] = {15, 15, 12, 13, 10, 12, 8, 7, 5, 3, 10, 13, 10, 12};
+unsigned char notes[NUM_NOTES] = {15, 15, 12, 13, 10, 12, 8, 7, 5, 3, 10, 13, 10, 12};
 
 // E E F G G F E D C C D E E D D   Ode to Joy
-unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15, 0, 0, 0, 0, 0, 0 };
+//unsigned char notes[NUM_NOTES] = {17, 17, 18, 20, 20, 18, 17, 15, 13, 13, 15, 17, 17, 15, 15, 0, 0, 0, 0, 0, 0 };
 unsigned char testnotes[NUM_NOTES];
 
 void play_note(unsigned short);
@@ -170,8 +170,9 @@ void check_if_select_pressed(void) {
 		_delay_ms(200);
 		DDRB |= (1 << PB3);
 		int i;
-		for (i = 0; i < NUM_NOTES; i++) {
-			OCR2A = (400*i)/NUM_NOTES;
+		int notesSize = sizeof(notes) / sizeof(notes[0]);
+		for (i = 0; i < notesSize; i++) {
+			OCR2A = (400*i)/notesSize;
 			play_note(note_freq[notes[i]]);
 			TCCR1B &= ~((1 << CS11) | (1 << CS10));
 		}
